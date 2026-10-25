@@ -21,7 +21,7 @@ header p{margin:4px 0 0;color:#d6efe8;font-size:16px}
 button.wa{background:#1f9d55}
 .card{background:var(--card);border:1px solid var(--line);border-top:4px solid var(--green2);border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 1px 3px rgba(0,0,0,.05)}
 .stage{display:flex;align-items:center;gap:12px;cursor:pointer}
-.stage.locked{opacity:.55;cursor:not-allowed}
+.stage.locked{opacity:.6}
 .num{flex:0 0 46px;height:46px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--green));border:2px solid var(--gold);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:bold}
 .stage.locked .num{background:var(--muted)}
 .stage h3{margin:0;font-size:19px}
@@ -48,6 +48,12 @@ button:disabled{opacity:.5;cursor:default}
 .rev:last-child{border:0}
 .rev b{color:var(--red)} .rev span{color:var(--green)}
 .hide{display:none}
+.mback{position:fixed;inset:0;background:rgba(10,40,50,.65);display:flex;align-items:center;justify-content:center;z-index:9;padding:16px}
+.mback.hide{display:none}
+.mbox{width:100%;max-width:420px;text-align:center}
+.mbox input{width:100%;font-family:inherit;font-size:24px;text-align:center;padding:12px;border:2px solid var(--line);border-radius:12px;margin:10px 0;direction:ltr}
+#mErr{color:var(--red);min-height:28px;font-size:17px}
+#sendStatus{font-size:17px;margin:6px 0}
 footer{text-align:center;color:#fff;font-size:17px;padding:16px 10px;margin:18px -16px 0;background:linear-gradient(135deg,var(--blue),var(--green));border-top:4px solid var(--gold);border-radius:24px 24px 0 0}
 footer small{display:block;color:#d6efe8;font-size:14px}
 </style>
@@ -62,9 +68,9 @@ footer small{display:block;color:#d6efe8;font-size:14px}
 
 <div id="home">
 <div class="card namebox"><label for="pname">اسم الطالب:</label><input id="pname" type="text" maxlength="40" placeholder="اكتب اسمك هنا" autocomplete="name"></div>
-<div class="card center" style="font-size:16px;color:var(--muted)">اكتب اسمك ثم اختر المرحلة. ست مراحل، في كل مرحلة 20 سؤالاً بأربعة خيارات. يُفتح كل مرحلة جديدة بتحقيق 14 من 20 على الأقل.</div>
+<div class="card center" style="font-size:16px;color:var(--muted)">اكتب اسمك ثم اختر المرحلة. ست مراحل، في كل مرحلة 20 سؤالاً بأربعة خيارات. المرحلة الأولى مفتوحة، وبقية المراحل تُفتح بكلمة مرور يرسلها لك المعلم. تُرسل نتيجتك إلى المعلم تلقائياً بعد كل مرحلة.</div>
 <div id="stages"></div>
-<div class="center"><button class="sec" id="unlockAll" style="font-size:15px;padding:8px 14px">فتح جميع المراحل</button> <button class="sec" id="resetAll" style="font-size:15px;padding:8px 14px">مسح النتائج</button></div>
+<div class="center"><button class="sec" id="resetAll" style="font-size:15px;padding:8px 14px">مسح النتائج</button></div>
 </div>
 
 <div id="quiz" class="hide">
@@ -84,10 +90,12 @@ footer small{display:block;color:#d6efe8;font-size:14px}
 <h2 class="center" id="rTitle" style="margin:0"></h2>
 <p class="score" id="rScore"></p>
 <p class="center" id="rMsg"></p>
+<div class="center" id="sendStatus"></div>
 <div class="row" id="rBtns"></div>
 </div>
 <div class="card hide" id="rvCard"><h3 style="margin-top:0">مراجعة الأسئلة التي أخطأت فيها</h3><div id="rv"></div></div>
 </div>
+<div id="modal" class="mback hide"><div class="card mbox"><h3 id="mTitle" style="margin:0"></h3><p style="margin:4px 0;color:var(--muted);font-size:16px">اطلب كلمة المرور من المعلم</p><input id="mPass" type="text" inputmode="numeric" autocomplete="off" placeholder="كلمة المرور"><div id="mErr"></div><div class="row"><button id="mOk">فتح المرحلة</button><button class="sec" id="mNo">إلغاء</button></div></div></div>
 <footer>إعداد وبرمجة وائل دهشان<small>اللهم انفعنا بما علمتنا</small></footer>
 </div>
 
@@ -229,13 +237,19 @@ var STAGES=[
 ];
 
 var PASS=14, KEY="kharida_quiz_v1";
+var TEACHER="waeldahshan@gmail.com";
+// كلمات المرور محفوظة بصيغة مشفّرة؛ الأولى فارغة لأن المرحلة الأولى مفتوحة
+var LOCK=[null,"1e78pjyi5xe","1an58wzrxrh","fima3ke1dm","1htx3u8vell","ig7ht0jrs9"];
+function hh(str){var h1=0xdeadbeef,h2=0x41c6ce57;for(var i=0,ch;i<str.length;i++){ch=str.charCodeAt(i);h1=Math.imul(h1^ch,2654435761);h2=Math.imul(h2^ch,1597334677);}h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);return (4294967296*(2097151&h2)+(h1>>>0)).toString(36)}
+function normPass(p){return String(p).replace(/[\u0660-\u0669]/g,function(c){return c.charCodeAt(0)-1632}).replace(/[\u06f0-\u06f9]/g,function(c){return c.charCodeAt(0)-1776}).replace(/\s+/g,"")}
+function passOk(i,p){return hh("khr#"+normPass(p))===LOCK[i]}
 var $=function(i){return document.getElementById(i)};
-var prog={best:[],all:false,name:""};
+var prog={best:[],unl:[],name:""};
 try{var s=localStorage.getItem(KEY);if(s)prog=JSON.parse(s)}catch(e){}
 function getName(){return ($("pname").value||"").trim()}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(prog))}catch(e){}}
 function show(id){["home","quiz","result"].forEach(function(x){$(x).classList.toggle("hide",x!==id)});window.scrollTo(0,0)}
-function unlocked(i){return prog.all||i===0||(prog.best[i-1]||0)>=PASS}
+function unlocked(i){return i===0||(prog.unl||[]).indexOf(i)>-1}
 
 function home(){
   var box=$("stages");box.innerHTML="";
@@ -251,7 +265,7 @@ function home(){
     b.textContent=(prog.best[i]!=null)?("أفضل نتيجة\n"+prog.best[i]+"/20"):"";
     b.style.whiteSpace="pre-line";
     d.appendChild(n);d.appendChild(m);d.appendChild(b);
-    if(ok)d.onclick=function(){if(!getName()){alert("من فضلك اكتب اسمك أولاً");$("pname").focus();return}start(i)};
+    d.onclick=function(){if(!getName()){alert("من فضلك اكتب اسمك أولاً");$("pname").focus();return}if(ok)start(i);else askPass(i,function(){start(i)})};
     box.appendChild(d);
   });
   show("home");
@@ -301,6 +315,39 @@ $("next").onclick=function(){
 };
 $("quit").onclick=function(){if(confirm("هل تريد الخروج من المرحلة؟"))home()};
 
+var lastBody=null;
+function sendResult(){
+  var st=$("sendStatus");st.style.color="#587a80";st.textContent="جارٍ إرسال النتيجة إلى المعلم…";
+  function fail(){
+    st.style.color="#b3402f";st.textContent="تعذّر إرسال النتيجة تلقائياً (تأكد من الاتصال بالإنترنت). ";
+    var b=document.createElement("button");b.textContent="إعادة المحاولة";b.style.padding="6px 14px";b.style.fontSize="16px";
+    b.onclick=sendResult;st.appendChild(b);
+  }
+  try{
+    fetch("https://formsubmit.co/ajax/"+TEACHER,{method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify(lastBody)})
+    .then(function(r){return r.json()})
+    .then(function(j){if(j&&(j.success===true||j.success==="true")){st.style.color="#1c9a56";st.textContent="✓ تم إرسال نتيجتك إلى المعلم"}else fail()})
+    .catch(fail);
+  }catch(e){fail()}
+}
+var askTarget=0,askCb=null;
+function askPass(i,cb){
+  askTarget=i;askCb=cb;
+  $("mTitle").textContent=STAGES[i].t.split(":")[0]+" مقفلة";
+  $("mPass").value="";$("mErr").textContent="";
+  $("modal").classList.remove("hide");setTimeout(function(){$("mPass").focus()},50);
+}
+function tryPass(){
+  if(passOk(askTarget,$("mPass").value)){
+    if(!prog.unl)prog.unl=[];
+    if(prog.unl.indexOf(askTarget)<0)prog.unl.push(askTarget);
+    save();$("modal").classList.add("hide");
+    var cb=askCb;askCb=null;if(cb)cb();
+  }else{$("mErr").textContent="كلمة المرور غير صحيحة"}
+}
+$("mOk").onclick=tryPass;
+$("mPass").addEventListener("keydown",function(e){if(e.key==="Enter")tryPass()});
+$("mNo").onclick=function(){$("modal").classList.add("hide");askCb=null};
 function finish(){
   var n=STAGES[cur].q.length;
   if(prog.best[cur]==null||score>prog.best[cur]){prog.best[cur]=score;save()}
@@ -309,11 +356,11 @@ function finish(){
   $("rScore").textContent=score+" / "+n;
   var pass=score>=PASS;
   var msg=score===n?"ما شاء الله! فهمٌ كامل لهذه المرحلة.":pass?"أحسنت! اجتزت المرحلة.":"حاول مرة أخرى؛ راجع الأبيات ثم أعد المحاولة. يلزم "+PASS+" على الأقل.";
-  if(pass&&cur<STAGES.length-1)msg+=" فُتحت المرحلة التالية.";
+  if(pass&&cur<STAGES.length-1)msg+=" للانتقال إلى المرحلة التالية اطلب كلمة المرور من المعلم.";
   $("rMsg").textContent=msg;
   var bt=$("rBtns");bt.innerHTML="";
   var again=document.createElement("button");again.textContent="إعادة المرحلة";again.onclick=function(){start(cur)};bt.appendChild(again);
-  if(pass&&cur<STAGES.length-1){var nx=document.createElement("button");nx.textContent="المرحلة التالية";nx.onclick=function(){start(cur+1)};bt.appendChild(nx)}
+  if(pass&&cur<STAGES.length-1){var nx=document.createElement("button");nx.textContent="المرحلة التالية";nx.onclick=function(){var t=cur+1;if(unlocked(t))start(t);else askPass(t,function(){start(t)})};bt.appendChild(nx)}
   var wa=document.createElement("button");wa.className="wa";wa.textContent="إرسال النتيجة عبر واتساب";
   wa.onclick=function(){
     var txt="مسابقة الخريدة البهية\nالطالب: "+prog.name+"\n"+STAGES[cur].t.split(":")[0]+"\nالنتيجة: "+score+" من "+n+(pass?" (ناجح)":" (لم يجتز بعد)")+"\nإعداد وبرمجة وائل دهشان";
@@ -331,14 +378,23 @@ function finish(){
     d.appendChild(a);d.appendChild(b);d.appendChild(c);d.appendChild(e);rv.appendChild(d);
   });
   $("rvCard").classList.toggle("hide",wrong.length===0);
+  lastBody={
+    _subject:"نتيجة مسابقة الخريدة البهية - "+prog.name+" - "+STAGES[cur].t.split(":")[0],
+    _template:"table",_captcha:"false",
+    "اسم الطالب":prog.name,
+    "المرحلة":STAGES[cur].t,
+    "النتيجة":score+" من "+n,
+    "الحالة":pass?"اجتاز المرحلة":"لم يجتز المرحلة",
+    "الوقت":new Date().toLocaleString("ar-JO"),
+    "الأسئلة التي أخطأ فيها":wrong.length?wrong.map(function(w,k){return (k+1)+") "+w.q+" — إجابته: "+w.mine}).join("\n"):"لا يوجد"
+  };
+  sendResult();
   show("result");
 }
-$("unlockAll").onclick=function(){prog.all=true;save();home()};
-$("resetAll").onclick=function(){if(confirm("مسح جميع النتائج؟")){prog={best:[],all:false};save();home()}};
+$("resetAll").onclick=function(){if(confirm("مسح جميع النتائج؟")){prog={best:[],unl:[],name:getName()};save();home()}};
 $("pname").value=prog.name||"";
 $("pname").addEventListener("input",function(){prog.name=getName();save()});
 home();
 </script>
 </body>
 </html>
-
