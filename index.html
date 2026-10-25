@@ -237,7 +237,7 @@ var STAGES=[
 ];
 
 var PASS=14, KEY="kharida_quiz_v1";
-var TEACHER="waeldahshan@gmail.com";
+var TEACHER="a91538f0c8904026f7208d0a694c4886"; // معرّف FormSubmit بدل الإيميل الصريح
 // كلمات المرور محفوظة بصيغة مشفّرة؛ الأولى فارغة لأن المرحلة الأولى مفتوحة
 var LOCK=[null,"1e78pjyi5xe","1an58wzrxrh","fima3ke1dm","1htx3u8vell","ig7ht0jrs9"];
 function hh(str){var h1=0xdeadbeef,h2=0x41c6ce57;for(var i=0,ch;i<str.length;i++){ch=str.charCodeAt(i);h1=Math.imul(h1^ch,2654435761);h2=Math.imul(h2^ch,1597334677);}h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);return (4294967296*(2097151&h2)+(h1>>>0)).toString(36)}
@@ -318,17 +318,31 @@ $("quit").onclick=function(){if(confirm("هل تريد الخروج من الم�
 var lastBody=null;
 function sendResult(){
   var st=$("sendStatus");st.style.color="#587a80";st.textContent="جارٍ إرسال النتيجة إلى المعلم…";
-  function fail(){
-    st.style.color="#b3402f";st.textContent="تعذّر إرسال النتيجة تلقائياً (تأكد من الاتصال بالإنترنت). ";
+  function viaForm(why){
+    // طريقة احتياطية: إرسال نموذج عادي في إطار مخفي (لا تتأثر بقيود المتصفح)
+    try{
+      var fr=document.getElementById("hf");
+      if(!fr){fr=document.createElement("iframe");fr.name="hf";fr.id="hf";fr.style.display="none";document.body.appendChild(fr)}
+      var f=document.createElement("form");f.method="POST";f.action="https://formsubmit.co/"+TEACHER;f.target="hf";f.acceptCharset="utf-8";f.style.display="none";
+      for(var k in lastBody){var i=document.createElement("input");i.type="hidden";i.name=k;i.value=lastBody[k];f.appendChild(i)}
+      document.body.appendChild(f);f.submit();document.body.removeChild(f);
+      st.style.color="#17507a";st.textContent="أُرسلت النتيجة إلى المعلم (طريقة احتياطية، دون تأكيد استلام)";
+    }catch(e){fail(why)}
+  }
+  function fail(why){
+    st.style.color="#b3402f";st.textContent="تعذّر إرسال النتيجة تلقائياً"+(why?" ("+why+")":"")+". ";
     var b=document.createElement("button");b.textContent="إعادة المحاولة";b.style.padding="6px 14px";b.style.fontSize="16px";
     b.onclick=sendResult;st.appendChild(b);
   }
   try{
     fetch("https://formsubmit.co/ajax/"+TEACHER,{method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify(lastBody)})
     .then(function(r){return r.json()})
-    .then(function(j){if(j&&(j.success===true||j.success==="true")){st.style.color="#1c9a56";st.textContent="✓ تم إرسال نتيجتك إلى المعلم"}else fail()})
-    .catch(fail);
-  }catch(e){fail()}
+    .then(function(j){
+      if(j&&(j.success===true||j.success==="true")){st.style.color="#1c9a56";st.textContent="✓ تم إرسال نتيجتك إلى المعلم"}
+      else{fail(j&&j.message?String(j.message).slice(0,160):"رفض الخدمة")}
+    })
+    .catch(function(e){viaForm(String(e&&e.message||e))});
+  }catch(e){viaForm(String(e))}
 }
 var askTarget=0,askCb=null;
 function askPass(i,cb){
@@ -353,7 +367,7 @@ function finish(){
   if(prog.best[cur]==null||score>prog.best[cur]){prog.best[cur]=score;save()}
   $("rWho").textContent="الطالب: "+prog.name;
   $("rTitle").textContent=STAGES[cur].t.split(":")[0];
-  $("rScore").textContent=score+" / "+n;
+  $("rScore").textContent=score+" من "+n;
   var pass=score>=PASS;
   var msg=score===n?"ما شاء الله! فهمٌ كامل لهذه المرحلة.":pass?"أحسنت! اجتزت المرحلة.":"حاول مرة أخرى؛ راجع الأبيات ثم أعد المحاولة. يلزم "+PASS+" على الأقل.";
   if(pass&&cur<STAGES.length-1)msg+=" للانتقال إلى المرحلة التالية اطلب كلمة المرور من المعلم.";
